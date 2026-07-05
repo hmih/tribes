@@ -1,0 +1,13 @@
+[package]
+name = "tascend"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+bevy = "0.16"
+
+[profile.dev]
+opt-level = 1
+
+[profile.release]
+opt-level = 3
