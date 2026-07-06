@@ -1,3 +1,14 @@
+# This file documents the intended Rust toolchain for the project.
+# The actual toolchain is provided by fenix in shell.nix (nightly with
+# cranelift, clippy, miri, rust-analyzer). This file is kept for reference
+# and for use outside the nix-shell (e.g. rustup users).
 [toolchain]
 channel = "nightly"
-components = ["rustc-codegen-cranelift-preview", "clippy", "miri", "rust-analyzer"]
+components = [
+  "rustc-codegen-cranelift-preview",
+  "clippy",
+  "rustfmt",
+  "miri",
+  "rust-analyzer",
+  "rust-src",
+]

@@ -1,7 +1,7 @@
 #![allow(unused_imports)]
 
-use bevy::app::App;
 use bevy::DefaultPlugins;
+use bevy::app::App;
 use log::info;
 
 fn main() {

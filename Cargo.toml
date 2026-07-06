@@ -57,3 +57,13 @@ lto = "thin"
 # Allow some clippy lints that are too noisy in gamedev
 too_many_arguments = "allow"
 type_complexity = "allow"
+# Warn on common pitfalls
+undocumented_unsafe_blocks = "warn"
+as_conversions = "warn"
+unwrap_used = "warn"
+expect_used = "warn"
+dbg_macro = "warn"
+print_stdout = "warn"
+# These are too strict for now but good to aspire to
+# single_match_else = "warn"
+# large_enum_variant = "warn"

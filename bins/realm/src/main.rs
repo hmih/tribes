@@ -5,7 +5,9 @@ use sqlx::sqlite::SqlitePoolOptions;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let _ = tracing_subscriber::fmt().with_max_level(tracing::Level::INFO).init();
+    let _ = tracing_subscriber::fmt()
+        .with_max_level(tracing::Level::INFO)
+        .init();
     info!("Tribes realm server starting");
 
     let _pool = SqlitePoolOptions::new()
