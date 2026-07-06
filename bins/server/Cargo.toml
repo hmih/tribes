@@ -1,0 +1,13 @@
+[package]
+name = "tribes-server-bin"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "server"
+path = "src/main.rs"
+
+[dependencies]
+tribes-server.workspace = true
+bevy.workspace = true
+log.workspace = true

@@ -1,0 +1,13 @@
+[package]
+name = "tribes-client-bin"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "client"
+path = "src/main.rs"
+
+[dependencies]
+tribes-client.workspace = true
+bevy.workspace = true
+log.workspace = true

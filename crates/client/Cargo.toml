@@ -1,0 +1,59 @@
+[package]
+name = "tribes-client"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+tribes-core.workspace = true
+tribes-protocol.workspace = true
+tribes-physics.workspace = true
+tribes-input.workspace = true
+tribes-assets.workspace = true
+
+bevy = { workspace = true, features = [
+  # Core
+  "std", "multi_threaded", "async_executor",
+  "bevy_asset", "bevy_log", "bevy_state",
+  "reflect_auto_register",
+  "serialize",
+
+  # Platform (no gamepad)
+  "bevy_winit", "bevy_clipboard", "default_font",
+  "x11",
+
+  # Input (keyboard + mouse only)
+  "keyboard", "mouse",
+
+  # 3D rendering
+  "3d_api", "3d_bevy_render",
+  "bevy_render", "bevy_core_pipeline",
+  "bevy_mesh", "bevy_material", "bevy_pbr",
+  "bevy_mikktspace",
+  "bevy_light", "bevy_camera", "bevy_color",
+  "bevy_gizmos", "bevy_gizmos_render",
+  "bevy_anti_alias",
+  "bevy_gltf", "bevy_image", "png",
+  "ktx2",
+
+  # Window
+  "bevy_window",
+
+  # Animation
+  "bevy_animation", "gltf_animation", "morph_animation",
+
+  # Dev
+  "dev",
+] }
+
+avian3d = { workspace = true, features = ["3d", "f32", "parry-f32", "enhanced-determinism", "debug-plugin"] }
+lightyear = { workspace = true, features = [
+  "client", "avian3d", "leafwing", "udp",
+  "netcode", "prediction", "interpolation", "replication",
+] }
+leafwing-input-manager.workspace = true
+
+# Visual and audio plugins (commented out until needed in later milestones)
+# bevy_egui = "0.41"
+# bevy_hanabi = "0.19"
+# bevy_kira_audio = "0.26"
+# bevy_tweening = "0.16"

@@ -1,0 +1,8 @@
+# macOS — default linker is fast enough, no LLD/mold needed
+
+[profile.dev]
+# cranelift requires nightly rustup component, not available in nix-shell
+# codegen-backend = "cranelift"
+
+# [profile.dev.package."*"]
+# codegen-backend = "llvm"

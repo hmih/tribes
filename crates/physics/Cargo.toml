@@ -1,0 +1,8 @@
+[package]
+name = "tribes-physics"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+tribes-core.workspace = true
+avian3d = { workspace = true, features = ["3d", "f32", "parry-f32", "enhanced-determinism"] }

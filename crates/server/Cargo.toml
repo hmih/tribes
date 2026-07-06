@@ -1,0 +1,26 @@
+[package]
+name = "tribes-server"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+tribes-core.workspace = true
+tribes-protocol.workspace = true
+tribes-physics.workspace = true
+tribes-input.workspace = true
+tribes-assets.workspace = true
+
+# Headless Bevy: ECS only, no rendering/windowing
+bevy = { workspace = true, features = [
+  "std", "multi_threaded", "async_executor",
+  "bevy_asset", "bevy_log", "bevy_state",
+  "serialize",
+  "bevy_scene", "bevy_world_serialization",
+] }
+
+avian3d = { workspace = true, features = ["3d", "f32", "parry-f32", "enhanced-determinism"] }
+lightyear = { workspace = true, features = [
+  "server", "avian3d", "leafwing", "udp",
+  "netcode", "prediction", "replication",
+] }
+leafwing-input-manager.workspace = true

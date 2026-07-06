@@ -1,0 +1,1 @@
+//! Client-side Bevy plugins: rendering, prediction, audio, UI.

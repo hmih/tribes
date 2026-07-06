@@ -1,0 +1,10 @@
+[package]
+name = "tribes-input"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+tribes-core.workspace = true
+bevy = { workspace = true, features = ["std"] }
+leafwing-input-manager.workspace = true
+serde.workspace = true

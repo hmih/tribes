@@ -1,13 +1,59 @@
-[package]
-name = "tribes"
+[workspace]
+resolver = "3"
+members = [
+  "crates/core",
+  "crates/protocol",
+  "crates/physics",
+  "crates/input",
+  "crates/assets",
+  "crates/client",
+  "crates/server",
+  "crates/realm",
+  "bins/client",
+  "bins/server",
+  "bins/realm",
+]
+
+[workspace.package]
 version = "0.1.0"
 edition = "2024"
 
-[dependencies]
-bevy = "0.19"
+[workspace.dependencies]
+bevy = { version = "0.19", default-features = false }
+avian3d = { version = "0.7", default-features = false }
+lightyear = { version = "0.28", default-features = false }
+leafwing-input-manager = { version = "0.21", default-features = false }
 
+tribes-core = { path = "crates/core" }
+tribes-protocol = { path = "crates/protocol" }
+tribes-physics = { path = "crates/physics" }
+tribes-input = { path = "crates/input" }
+tribes-assets = { path = "crates/assets" }
+tribes-client = { path = "crates/client" }
+tribes-server = { path = "crates/server" }
+tribes-realm = { path = "crates/realm" }
+
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+glam = "0.29"
+log = { version = "0.4", features = ["max_level_debug", "release_max_level_warn"] }
+
+
+# --- Dev profiles: fast iteration ---
 [profile.dev]
 opt-level = 1
 
+[profile.dev.package."*"]
+opt-level = 3
+
+# --- Release profiles: best runtime perf ---
 [profile.release]
 opt-level = 3
+codegen-units = 1
+lto = "thin"
+
+# --- Clippy ---
+[workspace.lints.clippy]
+# Allow some clippy lints that are too noisy in gamedev
+too_many_arguments = "allow"
+type_complexity = "allow"

@@ -1,0 +1,107 @@
+syntax = "proto3";
+package tribes.realm;
+
+message Empty {}
+
+message RegisterRequest {
+  string username = 1;
+  string password = 2;
+}
+
+message LoginRequest {
+  string username = 1;
+  string password = 2;
+}
+
+message AuthResponse {
+  string token = 1;
+  uint32 user_id = 2;
+}
+
+message ServerInfo {
+  uint64 id = 1;
+  string addr = 2;
+  string region = 3;
+  string current_map = 4;
+  uint32 player_count = 5;
+  uint32 max_players = 6;
+}
+
+message ServerList {
+  repeated ServerInfo servers = 1;
+}
+
+message QueueResponse {
+  string server_addr = 1;
+  string connect_token = 2;
+}
+
+message RegisterServerRequest {
+  string addr = 1;
+  string region = 2;
+  uint32 max_players = 3;
+}
+
+message ServerRegistration {
+  uint64 id = 1;
+}
+
+message ServerStatus {
+  uint64 id = 1;
+  string current_map = 2;
+  uint32 player_count = 3;
+}
+
+message ServerId {
+  uint64 id = 1;
+}
+
+message ValidateSessionRequest {
+  string token = 1;
+  uint64 user_id = 2;
+}
+
+message ValidateSessionResponse {
+  bool valid = 1;
+}
+
+message PlayerMatchResult {
+  uint32 user_id = 1;
+  uint32 kills = 2;
+  uint32 deaths = 3;
+  uint32 captures = 4;
+  bool won = 5;
+}
+
+message MatchResult {
+  string map = 1;
+  uint64 server_id = 2;
+  repeated PlayerMatchResult players = 3;
+}
+
+message PlayerStats {
+  uint32 kills = 1;
+  uint32 deaths = 2;
+  uint32 captures = 3;
+  uint32 wins = 4;
+  uint32 losses = 5;
+  uint32 matches_played = 6;
+}
+
+service Realm {
+  rpc Register(RegisterRequest) returns (AuthResponse);
+  rpc Login(LoginRequest) returns (AuthResponse);
+  rpc ListServers(Empty) returns (ServerList);
+  rpc Queue(Empty) returns (QueueResponse);
+  rpc Dequeue(Empty) returns (Empty);
+  rpc Heartbeat(Empty) returns (Empty);
+  rpc GetStats(Empty) returns (PlayerStats);
+}
+
+service RealmAdmin {
+  rpc RegisterServer(RegisterServerRequest) returns (ServerRegistration);
+  rpc UpdateServerStatus(ServerStatus) returns (Empty);
+  rpc UnregisterServer(ServerId) returns (Empty);
+  rpc ValidateSession(ValidateSessionRequest) returns (ValidateSessionResponse);
+  rpc SubmitMatchResult(MatchResult) returns (Empty);
+}
