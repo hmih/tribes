@@ -1,1 +1,1 @@
-//! Asset loaders for Tribes map/game-object JSON and T3D parser.
+//! Asset loaders for converted Tribes map data (glTF scenes + gameplay JSON).

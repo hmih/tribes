@@ -150,10 +150,14 @@ tribes/                                ← public submodule (src/port/)
 
 **Asset paths:** Port code references assets in the parent tascend repo via:
 ```
+../../decompile/assets/maps/<Map>/<Map>.gltf              # combined geometry scene
+../../decompile/assets/maps/<Map>/<Map>.scene.json        # mesh instances + transforms
+../../decompile/assets/maps/<Map>/<Map>.scene.actors.json # gameplay actors (spawns, flags)
+../../decompile/assets/maps/<Map>/<Map>.terrain.gltf      # terrain mesh (17 maps)
+../../decompile/assets/static-meshes/<MeshName>.gltf      # deduplicated flat dir
 ../../decompile/assets/skeletal-meshes/...
-../../decompile/assets/static-meshes/...
 ../../decompile/assets/sounds/...
-../../decompile/assets/maps/...
+../../decompile/assets/textures/...
 ../../decompile/assets/game-objects/...
 ```
 
@@ -165,13 +169,38 @@ tribes/                                ← public submodule (src/port/)
 
 | Asset Type | Format | Count | Size | Status |
 |-----------|--------|-------|------|--------|
+| Maps (geometry) | `.gltf` (glTF 2.0, combined) | 18 | ~120 MB | Valid, all 18 maps assembled |
+| Maps (terrain) | `.gltf` (glTF 2.0) | 17 | ~50 MB | Valid, TerrainComponent world-space vertices |
+| Maps (scene) | `.json` (structured) | 18 | ~15 MB | Valid, mesh instances + transforms |
+| Maps (actors) | `.json` (structured) | 18 | ~2 MB | Valid, gameplay actors (spawns, flags) |
 | Skeletal meshes | `.glb` (glTF 2.0) | 269 + 73,079 anims | 1.2 GB | Valid, loads in Bevy |
-| Static meshes | `.gltf` (glTF 2.0, inline buffer) | 140 (86k verts, 91k tris) | ~62 MB | **Fixed 2026-07-06**, loads in Bevy |
+| Static meshes | `.gltf` (glTF 2.0, inline buffer) | 1,155 (deduplicated) | ~63 MB | Valid, smooth normals, loads in Bevy |
 | Textures | `.png` | 2,137 | 2.0 GB | Valid, loads in Bevy |
 | Sounds | `.ogg` | 1,543 | 35 MB | Valid, loads via bevy_kira_audio |
-| Maps | `.json` (T3D text in properties) | 123 | 668 MB | Needs T3D parser |
 | Game objects | `.json` (T3D text in properties) | 548 | 8.4 MB | Needs T3D parser |
 | Manifest | `.json` (structured) | 1 | 6.4 MB | Valid, links code→assets |
+
+### Asset Directory Structure (runtime, tracked in Git LFS)
+
+```
+src/decompile/assets/
+├── maps/                              # One dir per map, runtime assets only
+│   └── <MapName>/
+│       ├── <MapName>.gltf             # Combined geometry scene (all mesh instances)
+│       ├── <MapName>.scene.json       # Mesh instances with UE3→glTF transforms
+│       ├── <MapName>.scene.actors.json# Gameplay actors (spawns, flags, turrets)
+│       └── <MapName>.terrain.gltf     # Terrain mesh (17 maps, Arena has none)
+├── static-meshes/                     # Flat, deduplicated (1,155 unique meshes)
+│   └── <MeshName>.gltf
+├── skeletal-meshes/                  # Per-package (TribesGame/SkeletalMesh3/)
+├── textures/                          # Per-package (TribesGame/Texture2D/)
+├── sounds/                            # Per-package (TribesGame/SoundNodeWave/)
+└── game-objects/                      # One JSON per .u package
+```
+
+Build-time intermediates (raw T3D JSON, .pskx, .terrain.bin) are NOT tracked —
+they are regenerated from `original/` via the slicer + map-converter pipeline
+(`make maps-batch` or `scripts/batch_maps.sh`).
 
 ### T3D Property Parser (todo: `crates/assets/`)
 
