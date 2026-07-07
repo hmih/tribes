@@ -23,7 +23,7 @@ use tribes_core::Team;
 ///
 /// Default assumes the `bin/client` is run with the `AssetServer` folder
 /// pointed at `src/decompile/assets/`. Override via [`MapViewerPlugin::new`].
-const DEFAULT_ASSETS_ROOT: &str = "../../decompile/assets";
+const DEFAULT_ASSETS_ROOT: &str = "";
 
 /// Message requesting a map load. The string is the map directory name
 /// (e.g. `"Perdition"`); files are resolved as `maps/<Map>/<Map>.gltf`,
