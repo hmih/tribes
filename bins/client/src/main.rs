@@ -5,8 +5,8 @@ use tribes_client::{FlycamPlugin, MapLoadRequest, MapViewerPlugin};
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins.set(AssetPlugin {
-            // Asset root: src/decompile/assets/ (relative to src/port/)
-            file_path: "../../decompile/assets".into(),
+            // Asset root: src/decompile/assets/ (relative to bins/client manifest dir)
+            file_path: "../../../decompile/assets".into(),
             ..default()
         }))
         .add_plugins(FlycamPlugin)
