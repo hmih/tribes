@@ -14,8 +14,8 @@
 
 use std::f32::consts::FRAC_PI_2;
 
-use bevy::asset::{AssetPath, LoadState};
-use bevy::prelude::{GizmoConfig, GizmoLineConfig, GizmoLineJoint, *};
+use bevy::asset::LoadState;
+use bevy::prelude::{DefaultGizmoConfigGroup, GizmoLineConfig, GizmoLineJoint, *};
 use tribes_assets::{AssetsPlugin, MapActors, t3d};
 use tribes_core::Team;
 
@@ -25,10 +25,10 @@ use tribes_core::Team;
 /// pointed at `src/decompile/assets/`. Override via [`MapViewerPlugin::new`].
 const DEFAULT_ASSETS_ROOT: &str = "../../decompile/assets";
 
-/// Event requesting a map load. The string is the map directory name
+/// Message requesting a map load. The string is the map directory name
 /// (e.g. `"Perdition"`); files are resolved as `maps/<Map>/<Map>.gltf`,
 /// `maps/<Map>/<Map>_Ter.terrain.gltf`, and `maps/<Map>/<Map>.scene.actors.json`.
-#[derive(Event, Clone, Debug)]
+#[derive(Message, Clone, Debug)]
 pub struct MapLoadRequest(pub String);
 
 /// Tracks handles for the currently-loading map. The static scene, terrain
@@ -112,16 +112,19 @@ impl MapViewerPlugin {
 impl Plugin for MapViewerPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(AssetsPlugin)
-            .add_event::<MapLoadRequest>()
+            .add_message::<MapLoadRequest>()
             .insert_resource(PendingMap::default())
             .insert_resource(MapAssetsRoot(self.assets_root.clone()))
-            .insert_resource(GizmoConfig {
-                line: GizmoLineConfig {
-                    joints: GizmoLineJoint::Round(4),
+            .insert_gizmo_config::<DefaultGizmoConfigGroup>(
+                DefaultGizmoConfigGroup,
+                GizmoConfig {
+                    line: GizmoLineConfig {
+                        joints: GizmoLineJoint::Round(4),
+                        ..default()
+                    },
                     ..default()
                 },
-                ..default()
-            })
+            )
             .add_systems(
                 Update,
                 (
@@ -137,20 +140,17 @@ impl Plugin for MapViewerPlugin {
 }
 
 fn handle_map_load_request(
-    mut events: EventReader<MapLoadRequest>,
+    mut reader: MessageReader<MapLoadRequest>,
     mut pending: ResMut<PendingMap>,
     asset_server: Res<AssetServer>,
     assets_root: Res<MapAssetsRoot>,
 ) {
-    for MapLoadRequest(map) in events.read() {
+    for request in reader.read() {
+        let map = &request.0;
         let map_dir = format!("{}/maps/{}", assets_root.0, map);
-        let gltf = asset_server.load(AssetPath::parse(format!("{map_dir}/{map}.gltf").as_str()));
-        let terrain = asset_server.load(AssetPath::parse(
-            format!("{map_dir}/{map}_Ter.terrain.gltf").as_str(),
-        ));
-        let actors = asset_server.load(AssetPath::parse(
-            format!("{map_dir}/{map}.scene.actors.json").as_str(),
-        ));
+        let gltf = asset_server.load(format!("{map_dir}/{map}.gltf"));
+        let terrain = asset_server.load(format!("{map_dir}/{map}_Ter.terrain.gltf"));
+        let actors = asset_server.load(format!("{map_dir}/{map}.scene.actors.json"));
 
         info!(map = %map, "Loading map assets");
         *pending = PendingMap {
@@ -210,12 +210,12 @@ fn spawn_terrain_scene(
     }
     // Tolerate missing terrain files (Arena has none). If the asset failed to
     // load, mark as done without spawning.
-    if let Some(state) = asset_server.get_load_state(id) {
-        if matches!(state, LoadState::Failed(_)) {
-            pending.spawned_terrain = true;
-            debug!(map = %pending.map_name, "No terrain glTF for this map");
-            return;
-        }
+    if let Some(state) = asset_server.get_load_state(id)
+        && matches!(state, LoadState::Failed(_))
+    {
+        pending.spawned_terrain = true;
+        debug!(map = %pending.map_name, "No terrain glTF for this map");
+        return;
     }
     let Some(gltf) = gltf_assets.get(terrain_handle) else {
         return;

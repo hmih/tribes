@@ -14,7 +14,7 @@ bevy = { workspace = true, features = [
   # Core
   "std", "multi_threaded", "async_executor",
   "bevy_asset", "bevy_log", "bevy_state",
-  "reflect_auto_register",
+  "reflect_auto_register_static",
   "serialize",
 
   # Platform (no gamepad)

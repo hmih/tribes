@@ -78,11 +78,11 @@ fn spawn_flycam(mut commands: Commands, config: Res<FlycamConfig>) {
 }
 
 fn flycam_look(
-    mut motion_events: EventReader<MouseMotion>,
+    mut motion_events: MessageReader<MouseMotion>,
     mouse_button: Res<ButtonInput<MouseButton>>,
     mut query: Query<(&mut Flycam, &mut Transform)>,
     config: Res<FlycamConfig>,
-    mut window: Query<&mut bevy::window::Window>,
+    mut cursor: Query<&mut bevy::window::CursorOptions>,
 ) {
     if !mouse_button.pressed(MouseButton::Right) {
         return;
@@ -91,11 +91,11 @@ fn flycam_look(
     if total == Vec2::ZERO {
         return;
     }
-    if let Ok(mut win) = window.get_single_mut() {
-        if config.grab_cursor {
-            win.cursor_options.grab_mode = CursorGrabMode::Locked;
-            win.cursor_options.visible = false;
-        }
+    if let Ok(mut opts) = cursor.single_mut()
+        && config.grab_cursor
+    {
+        opts.grab_mode = CursorGrabMode::Locked;
+        opts.visible = false;
     }
     let Ok((mut fly, mut tf)) = query.single_mut() else {
         return;
