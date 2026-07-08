@@ -39,12 +39,14 @@ pub struct FlycamConfig {
 impl Default for FlycamConfig {
     fn default() -> Self {
         Self {
-            // Spawn above the origin looking out across Perdition's basin.
-            start_position: Vec3::new(0.0, 1500.0, 3000.0),
-            start_yaw: -FRAC_PI_2,
-            start_pitch: -0.3,
-            move_speed: 1500.0,
-            sprint_multiplier: 5.0,
+            // Spawn above the map looking down. The map (excluding ~880k-unit
+            // skydomes, which are culled) spans about ±33k units; start 25k up
+            // at a steep pitch so the whole arena is visible on first frame.
+            start_position: Vec3::new(0.0, 25_000.0, 0.0),
+            start_yaw: 0.0,
+            start_pitch: -1.2,
+            move_speed: 3_000.0,
+            sprint_multiplier: 8.0,
             sensitivity: 0.0025,
             grab_cursor: true,
         }
@@ -72,8 +74,15 @@ fn spawn_flycam(mut commands: Commands, config: Res<FlycamConfig>) {
             pitch: config.start_pitch,
         },
         Transform::from_translation(config.start_position).with_rotation(rotation),
-        GlobalTransform::IDENTITY,
+        GlobalTransform::from(Transform::from_translation(config.start_position).with_rotation(rotation)),
         Visibility::default(),
+        Camera3d::default(),
+        Projection::Perspective(PerspectiveProjection {
+            fov: 60.0f32.to_radians(),
+            near: 1.0,
+            far: 1_000_000.0,
+            ..default()
+        }),
     ));
 }
 

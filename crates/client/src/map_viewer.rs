@@ -15,9 +15,17 @@
 use std::f32::consts::FRAC_PI_2;
 
 use bevy::asset::LoadState;
+use bevy::camera::primitives::Aabb;
+use bevy::light::GlobalAmbientLight;
 use bevy::prelude::{DefaultGizmoConfigGroup, GizmoLineConfig, GizmoLineJoint, *};
 use tribes_assets::{AssetsPlugin, MapActors, t3d};
 use tribes_core::Team;
+
+/// Default world-space size threshold (in glTF units) above which a mesh is
+/// considered a sky-dome / occlusion hull and hidden from rendering. Perdition
+/// has 4–5 such meshes spanning ~880k units; the actual map geometry is
+/// bounded at ~210k units across. Tune via [`MapCullConfig`].
+pub const DEFAULT_SKYDOME_CULL_SIZE: f32 = 500_000.0;
 
 /// Resource prefix (relative to `AssetServer` root) for the assets directory.
 ///
@@ -47,6 +55,28 @@ struct PendingMap {
 
 #[derive(Resource)]
 struct MapAssetsRoot(String);
+
+/// Configures culling for loaded map meshes.
+///
+/// - `max_mesh_size`: meshes whose world-space AABB exceeds this on any axis
+///   are hidden (skydomes / occlusion hulls). Set to `f32::INFINITY` to disable.
+#[derive(Resource, Clone)]
+pub struct MapCullConfig {
+    pub max_mesh_size: f32,
+}
+
+impl Default for MapCullConfig {
+    fn default() -> Self {
+        Self {
+            max_mesh_size: DEFAULT_SKYDOME_CULL_SIZE,
+        }
+    }
+}
+
+/// Marker added after a mesh has had its default material assigned. Lets the
+/// per-frame system skip entities it has already touched.
+#[derive(Component)]
+struct DefaultMaterialApplied;
 
 /// Marker on spawned gameplay actor entities, carrying their kind + team.
 #[derive(Component, Debug)]
@@ -115,6 +145,12 @@ impl Plugin for MapViewerPlugin {
             .add_message::<MapLoadRequest>()
             .insert_resource(PendingMap::default())
             .insert_resource(MapAssetsRoot(self.assets_root.clone()))
+            .init_resource::<MapCullConfig>()
+            .insert_resource(GlobalAmbientLight {
+                color: Color::srgb(0.6, 0.65, 0.75),
+                brightness: 60.0,
+                affects_lightmapped_meshes: true,
+            })
             .insert_gizmo_config::<DefaultGizmoConfigGroup>(
                 DefaultGizmoConfigGroup,
                 GizmoConfig {
@@ -125,6 +161,7 @@ impl Plugin for MapViewerPlugin {
                     ..default()
                 },
             )
+            .add_systems(Startup, spawn_sun_light)
             .add_systems(
                 Update,
                 (
@@ -132,11 +169,24 @@ impl Plugin for MapViewerPlugin {
                     spawn_static_scene,
                     spawn_terrain_scene,
                     spawn_actor_markers,
+                    apply_default_materials_and_cull,
                     draw_gameplay_marker_gizmos,
                 )
                     .chain(),
             );
     }
+}
+
+fn spawn_sun_light(mut commands: Commands) {
+    commands.spawn((
+        DirectionalLight {
+            shadow_maps_enabled: true,
+            illuminance: 25_000.0,
+            ..default()
+        },
+        Transform::from_xyz(15_000.0, 80_000.0, 25_000.0).looking_at(Vec3::ZERO, Vec3::Y),
+        GlobalTransform::IDENTITY,
+    ));
 }
 
 fn handle_map_load_request(
@@ -185,6 +235,9 @@ fn spawn_static_scene(
     };
     commands.spawn((
         WorldAssetRoot(scene.clone()),
+        Transform::default(),
+        GlobalTransform::IDENTITY,
+        Visibility::default(),
         Name::new(format!("Map: {}", pending.map_name)),
     ));
     pending.spawned_static = true;
@@ -226,6 +279,9 @@ fn spawn_terrain_scene(
     };
     commands.spawn((
         WorldAssetRoot(scene.clone()),
+        Transform::default(),
+        GlobalTransform::IDENTITY,
+        Visibility::default(),
         Name::new(format!("Terrain: {}", pending.map_name)),
     ));
     pending.spawned_terrain = true;
@@ -322,4 +378,128 @@ fn draw_gameplay_marker_gizmos(
             }
         }
     }
+}
+
+/// For every loaded map mesh that doesn't already have a material, attach a
+/// `StandardMaterial` with a per-entity pseudo-random color so the map
+/// structure is visually distinguishable. Also hides meshes whose world-space
+/// AABB exceeds `MapCullConfig::max_mesh_size` on any axis — these are the
+/// sky-dome / occlusion-hull meshes (Perdition has a few at ~880k units).
+///
+/// Idempotent: tagged entities are skipped on subsequent frames.
+fn apply_default_materials_and_cull(
+    mut commands: Commands,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    config: Res<MapCullConfig>,
+    meshes: Query<
+        (
+            Entity,
+            &Aabb,
+            &GlobalTransform,
+            Option<&MeshMaterial3d<StandardMaterial>>,
+        ),
+        (With<Mesh3d>, Without<DefaultMaterialApplied>),
+    >,
+) {
+    let cull = config.max_mesh_size.is_finite() && config.max_mesh_size > 0.0;
+    let max = config.max_mesh_size;
+
+    let mut touched = 0usize;
+    let mut hidden = 0usize;
+    let mut matted = 0usize;
+    for (entity, aabb, xform, existing_mat) in &meshes {
+        let lo = aabb.min();
+        let hi = aabb.max();
+        let corners = [
+            Vec3A::new(lo.x, lo.y, lo.z),
+            Vec3A::new(hi.x, lo.y, lo.z),
+            Vec3A::new(lo.x, hi.y, lo.z),
+            Vec3A::new(hi.x, hi.y, lo.z),
+            Vec3A::new(lo.x, lo.y, hi.z),
+            Vec3A::new(hi.x, lo.y, hi.z),
+            Vec3A::new(lo.x, hi.y, hi.z),
+            Vec3A::new(hi.x, hi.y, hi.z),
+        ];
+        let mut wmin = Vec3A::splat(f32::INFINITY);
+        let mut wmax = Vec3A::splat(f32::NEG_INFINITY);
+        for c in corners {
+            let w = xform.affine().transform_point3a(c);
+            wmin = wmin.min(w);
+            wmax = wmax.max(w);
+        }
+        let size = wmax - wmin;
+        let is_skydome =
+            cull && (size.x > max || size.y > max || size.z > max);
+
+        if is_skydome {
+            commands.entity(entity).insert(Visibility::Hidden);
+            hidden += 1;
+        } else if existing_mat.is_none() {
+            // Pseudo-random per-entity color via FNV + splitmix64 on entity
+            // bits, so adjacent map objects are visually distinguishable.
+            let h = hash_u32(entity_to_u64(entity));
+            let base = hsl_to_rgb((h % 360) as f32, 0.85, 0.55);
+            let mat = materials.add(StandardMaterial {
+                base_color: Color::srgb(base.0, base.1, base.2),
+                perceptual_roughness: 0.7,
+                metallic: 0.0,
+                ..default()
+            });
+            commands.entity(entity).insert(MeshMaterial3d(mat));
+            matted += 1;
+        }
+        commands.entity(entity).insert(DefaultMaterialApplied);
+        touched += 1;
+    }
+    if touched > 0 {
+        info!(
+            touched,
+            matted, hidden, "Processed map mesh entities (materials + cull)"
+        );
+    }
+}
+
+/// Encode an `Entity` as a stable `u64` for hashing. Entity has a `u32` index
+/// + `u32` generation in Bevy 0.19.
+fn entity_to_u64(e: Entity) -> u64 {
+    let mut h: u64 = 1469598103934665603; // FNV offset basis
+    for word in [e.index_u32() as u64, e.generation().to_bits() as u64] {
+        for byte in word.to_le_bytes() {
+            h ^= byte as u64;
+            h = h.wrapping_mul(1099511628211); // FNV prime
+        }
+    }
+    h
+}
+
+fn hash_u32(mut x: u64) -> u32 {
+    x ^= x >> 33;
+    x = x.wrapping_mul(0xff51afd7ed558ccd);
+    x ^= x >> 33;
+    x = x.wrapping_mul(0xc4ceb9fe1a85ec53);
+    x ^= x >> 33;
+    x as u32
+}
+
+/// HSL → linear-ish RGB for `StandardMaterial::base_color`. We output in sRGB
+/// and let Bevy convert, so the input is treated as sRGB by `Color::srgb`.
+fn hsl_to_rgb(h_deg: f32, s: f32, l: f32) -> (f32, f32, f32) {
+    let h = (h_deg.rem_euclid(360.0)) / 360.0;
+    let c = (1.0 - (2.0 * l - 1.0).abs()) * s;
+    let x = c * (1.0 - ((h * 6.0) % 2.0 - 1.0).abs());
+    let m = l - c / 2.0;
+    let (r1, g1, b1) = if h < 1.0 / 6.0 {
+        (c, x, 0.0)
+    } else if h < 2.0 / 6.0 {
+        (x, c, 0.0)
+    } else if h < 3.0 / 6.0 {
+        (0.0, c, x)
+    } else if h < 4.0 / 6.0 {
+        (0.0, x, c)
+    } else if h < 5.0 / 6.0 {
+        (x, 0.0, c)
+    } else {
+        (c, 0.0, x)
+    };
+    (r1 + m, g1 + m, b1 + m)
 }
