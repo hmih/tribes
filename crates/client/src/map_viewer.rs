@@ -25,7 +25,7 @@ use tribes_core::Team;
 /// considered a sky-dome / occlusion hull and hidden from rendering. Perdition
 /// has 4–5 such meshes spanning ~880k units; the actual map geometry is
 /// bounded at ~210k units across. Tune via [`MapCullConfig`].
-pub const DEFAULT_SKYDOME_CULL_SIZE: f32 = 500_000.0;
+pub const DEFAULT_SKYDOME_CULL_SIZE: f32 = 2_000_000.0;
 
 /// Resource prefix (relative to `AssetServer` root) for the assets directory.
 ///
@@ -147,8 +147,8 @@ impl Plugin for MapViewerPlugin {
             .insert_resource(MapAssetsRoot(self.assets_root.clone()))
             .init_resource::<MapCullConfig>()
             .insert_resource(GlobalAmbientLight {
-                color: Color::srgb(0.6, 0.65, 0.75),
-                brightness: 60.0,
+                color: Color::srgb(1.0, 1.0, 1.0),
+                brightness: 200.0,
                 affects_lightmapped_meshes: true,
             })
             .insert_gizmo_config::<DefaultGizmoConfigGroup>(
@@ -181,10 +181,20 @@ fn spawn_sun_light(mut commands: Commands) {
     commands.spawn((
         DirectionalLight {
             shadow_maps_enabled: true,
-            illuminance: 25_000.0,
+            illuminance: 80_000.0,
             ..default()
         },
-        Transform::from_xyz(15_000.0, 80_000.0, 25_000.0).looking_at(Vec3::ZERO, Vec3::Y),
+        Transform::from_xyz(50_000.0, 150_000.0, 50_000.0).looking_at(Vec3::ZERO, Vec3::Y),
+        GlobalTransform::IDENTITY,
+    ));
+    // Fill light from the opposite side
+    commands.spawn((
+        DirectionalLight {
+            shadow_maps_enabled: false,
+            illuminance: 15_000.0,
+            ..default()
+        },
+        Transform::from_xyz(-50_000.0, 80_000.0, -50_000.0).looking_at(Vec3::ZERO, Vec3::Y),
         GlobalTransform::IDENTITY,
     ));
 }
@@ -297,7 +307,15 @@ fn spawn_actor_markers(
     if pending.spawned_actors || pending.map_name.is_empty() {
         return;
     }
-    if !asset_server.is_loaded(pending.actors.id()) {
+    let id = pending.actors.id();
+    if !asset_server.is_loaded(id) {
+        return;
+    }
+    if let Some(state) = asset_server.get_load_state(id)
+        && matches!(state, LoadState::Failed(_))
+    {
+        pending.spawned_actors = true;
+        debug!(map = %pending.map_name, "No actor JSON for this map");
         return;
     }
     let Some(actors) = actor_assets.get(&pending.actors) else {

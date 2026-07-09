@@ -80,7 +80,7 @@ fn spawn_flycam(mut commands: Commands, config: Res<FlycamConfig>) {
         Projection::Perspective(PerspectiveProjection {
             fov: 60.0f32.to_radians(),
             near: 1.0,
-            far: 1_000_000.0,
+            far: 500_000.0,
             ..default()
         }),
     ));

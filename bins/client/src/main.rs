@@ -27,5 +27,5 @@ fn main() {
 }
 
 fn load_perdition(mut writer: bevy::ecs::message::MessageWriter<MapLoadRequest>) {
-    writer.write(MapLoadRequest("Perdition".into()));
+    writer.write(MapLoadRequest("ArxNovena".into()));
 }
