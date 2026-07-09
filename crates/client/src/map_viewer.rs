@@ -572,7 +572,8 @@ fn debug_nearby_meshes(
     );
     for (dist, pos, name) in &nearby {
         out.push_str(&format!(
-            "dist={dist:.0} pos=({pos:.0},{pos:.0},{pos:.0}) {name}\n"
+            "dist={dist:.0} pos=({:.0},{:.0},{:.0}) {name}\n",
+            pos.x, pos.y, pos.z,
         ));
     }
 
