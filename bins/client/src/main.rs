@@ -9,11 +9,7 @@ use tribes_client::{FlycamPlugin, MapLoadRequest, MapViewerPlugin};
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins.set(AssetPlugin {
-            // Asset root: src/decompile/assets/ (relative to bins/client manifest dir)
-            file_path: "../../../decompile/assets".into(),
-            // glTF image URIs reference ../../raw/ which is outside the asset root.
-            // Allow until texture paths are fixed to stay within the asset tree.
-            unapproved_path_mode: UnapprovedPathMode::Allow,
+            file_path: "../../../importer/output/gltf".into(),
             ..default()
         }))
         // Safety net: bevy_transform 0.19 does not call register_type in its

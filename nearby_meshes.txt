@@ -1,9 +1,10 @@
-cam=(3813.8,4093.3,-11846.8) radius=2000.0 count=8
-dist=403 pos=([3706, 3744, -12016],[3706, 3744, -12016],[3706, 3744, -12016]) TrTeamRabbit-ArxNovena_Ter/ARCH_BloodEagle/SM/SM_BloodEagle_BldgB_07.MIC_BloodEagle_TrimsWindowsColm_Dark
-dist=904 pos=([3730, 3232, -12108],[3730, 3232, -12108],[3730, 3232, -12108]) TrTeamRabbit-ArxNovena_Ter/ARCH_ArxNovena_Waterworks/SM/SM_ArxNovena_River_Rapid.MAT_BloodEagle_Water_Rushing
-dist=1025 pos=([4289, 3243, -12164],[4289, 3243, -12164],[4289, 3243, -12164]) BellaOmegaRabbit_Ter/BellaOmega_Landscape02/SM/SM_BellaOmega_Landscape_Rock17.MIC_BellaOmega_Landscape_Rock17_V2
-dist=1086 pos=([4149, 3326, -12539],[4149, 3326, -12539],[4149, 3326, -12539]) BellaOmegaRabbit_Ter/BellaOmega_Landscape02/SM/SM_Katabatic_Landscape_BlackRock01.MAT_BellaOmega_Landscape_Master_Basic
-dist=1093 pos=([3601, 3218, -12465],[3601, 3218, -12465],[3601, 3218, -12465]) BellaOmegaRabbit_Ter/BellaOmega_LandScape_Decor/SM/SM_BellaOmega_Landscape_FlatRock.MIC_BellaOmega_LandScape_FlatRock
-dist=1113 pos=([3920, 3244, -12558],[3920, 3244, -12558],[3920, 3244, -12558]) BellaOmegaRabbit_Ter/BellaOmega_LandScape_Decor/SM/SM_BellaOmega_Landscape_FlatRock.MIC_BellaOmega_LandScape_FlatRock
-dist=1212 pos=([3482, 3277, -12680],[3482, 3277, -12680],[3482, 3277, -12680]) BellaOmegaRabbit_Ter/BellaOmega_Landscape02/SM/SM_Katabatic_Landscape_BlackRock01.MAT_BellaOmega_Landscape_Master_Basic
-dist=1225 pos=([3272, 3210, -12500],[3272, 3210, -12500],[3272, 3210, -12500]) BellaOmegaRabbit_Ter/BellaOmega_Landscape02/SM/SM_Katabatic_Landscape_BlackRock01.MAT_BellaOmega_Landscape_Master_Basic
+cam=(3785.8,3571.5,-11773.6) radius=2000.0 count=9
+dist=308 pos=(3706,3744,-12016) TrTeamRabbit-ArxNovena_Ter/ARCH_BloodEagle/SM/SM_BloodEagle_BldgB_07.MIC_BloodEagle_TrimsWindowsColm_Dark
+dist=480 pos=(3730,3232,-12108) TrTeamRabbit-ArxNovena_Ter/ARCH_ArxNovena_Waterworks/SM/SM_ArxNovena_River_Rapid.MAT_BloodEagle_Water_Rushing
+dist=717 pos=(4289,3243,-12164) BellaOmegaRabbit_Ter/BellaOmega_Landscape02/SM/SM_BellaOmega_Landscape_Rock17.MIC_BellaOmega_Landscape_Rock17_V2
+dist=799 pos=(3601,3218,-12465) BellaOmegaRabbit_Ter/BellaOmega_LandScape_Decor/SM/SM_BellaOmega_Landscape_FlatRock.MIC_BellaOmega_LandScape_FlatRock
+dist=861 pos=(3920,3244,-12558) BellaOmegaRabbit_Ter/BellaOmega_LandScape_Decor/SM/SM_BellaOmega_Landscape_FlatRock.MIC_BellaOmega_LandScape_FlatRock
+dist=882 pos=(4149,3326,-12539) BellaOmegaRabbit_Ter/BellaOmega_Landscape02/SM/SM_Katabatic_Landscape_BlackRock01.MAT_BellaOmega_Landscape_Master_Basic
+dist=960 pos=(3272,3210,-12500) BellaOmegaRabbit_Ter/BellaOmega_Landscape02/SM/SM_Katabatic_Landscape_BlackRock01.MAT_BellaOmega_Landscape_Master_Basic
+dist=1000 pos=(3482,3277,-12680) BellaOmegaRabbit_Ter/BellaOmega_Landscape02/SM/SM_Katabatic_Landscape_BlackRock01.MAT_BellaOmega_Landscape_Master_Basic
+dist=1803 pos=(4079,3233,-10027) BellaOmegaRabbit_Ter/BellaOmega_Landscape02/SM/SM_BellaOmega_Landscape_Rock17.MIC_BellaOmega_Landscape_Rock17_V2
