@@ -197,6 +197,14 @@ fn spawn_sun_light(mut commands: Commands) {
         Transform::from_xyz(-50_000.0, 80_000.0, -50_000.0).looking_at(Vec3::ZERO, Vec3::Y),
         GlobalTransform::IDENTITY,
     ));
+    // Environment map for specular/reflections on PBR materials
+    commands.spawn((
+        EnvironmentMapLight {
+            intensity: 2000.0,
+            ..default()
+        },
+        GlobalTransform::IDENTITY,
+    ));
 }
 
 fn handle_map_load_request(
