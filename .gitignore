@@ -2,4 +2,5 @@
 /target
 
 # macOS
-.DS_Storescene.log
+.DS_Store
+scene.log
