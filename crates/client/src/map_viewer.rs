@@ -25,7 +25,7 @@ use tribes_core::Team;
 /// considered a sky-dome / occlusion hull and hidden from rendering. Perdition
 /// has 4–5 such meshes spanning ~880k units; the actual map geometry is
 /// bounded at ~210k units across. Tune via [`MapCullConfig`].
-pub const DEFAULT_SKYDOME_CULL_SIZE: f32 = 2_000_000.0;
+pub const DEFAULT_SKYDOME_CULL_SIZE: f32 = 5_000_000.0;
 
 /// Resource prefix (relative to `AssetServer` root) for the assets directory.
 ///
@@ -58,8 +58,8 @@ struct MapAssetsRoot(String);
 
 /// Configures culling for loaded map meshes.
 ///
-/// - `max_mesh_size`: meshes whose world-space AABB exceeds this on any axis
-///   are hidden (skydomes / occlusion hulls). Set to `f32::INFINITY` to disable.
+/// - `max_mesh_size`: meshes whose world-space AABB exceeds this on any axis are hidden (skydomes /
+///   occlusion hulls). Set to `f32::INFINITY` to disable.
 #[derive(Resource, Clone)]
 pub struct MapCullConfig {
     pub max_mesh_size: f32,
@@ -77,6 +77,34 @@ impl Default for MapCullConfig {
 /// per-frame system skip entities it has already touched.
 #[derive(Component)]
 struct DefaultMaterialApplied;
+
+#[derive(Resource, Default)]
+struct MeshesLogged(u8);
+
+type UnmattedMeshQuery<'w, 's> = Query<
+    'w,
+    's,
+    (
+        Entity,
+        &'static Aabb,
+        &'static GlobalTransform,
+        Option<&'static MeshMaterial3d<StandardMaterial>>,
+    ),
+    (With<Mesh3d>, Without<DefaultMaterialApplied>),
+>;
+
+type LogMeshQuery<'w, 's> = Query<
+    'w,
+    's,
+    (
+        Entity,
+        &'static Aabb,
+        &'static GlobalTransform,
+        Option<&'static MeshMaterial3d<StandardMaterial>>,
+        Option<&'static Name>,
+    ),
+    With<Mesh3d>,
+>;
 
 /// Marker on spawned gameplay actor entities, carrying their kind + team.
 #[derive(Component, Debug)]
@@ -146,6 +174,7 @@ impl Plugin for MapViewerPlugin {
             .insert_resource(PendingMap::default())
             .insert_resource(MapAssetsRoot(self.assets_root.clone()))
             .init_resource::<MapCullConfig>()
+            .init_resource::<MeshesLogged>()
             .insert_resource(GlobalAmbientLight {
                 color: Color::srgb(1.0, 1.0, 1.0),
                 brightness: 200.0,
@@ -161,7 +190,7 @@ impl Plugin for MapViewerPlugin {
                     ..default()
                 },
             )
-            .add_systems(Startup, spawn_sun_light)
+            .add_systems(Startup, (spawn_sun_light, clear_scene_log))
             .add_systems(
                 Update,
                 (
@@ -170,11 +199,16 @@ impl Plugin for MapViewerPlugin {
                     spawn_terrain_scene,
                     spawn_actor_markers,
                     apply_default_materials_and_cull,
+                    log_loaded_meshes,
                     draw_gameplay_marker_gizmos,
                 )
                     .chain(),
             );
     }
+}
+
+fn clear_scene_log() {
+    let _ = std::fs::write("scene.log", "");
 }
 
 fn spawn_sun_light(mut commands: Commands) {
@@ -417,15 +451,7 @@ fn apply_default_materials_and_cull(
     mut commands: Commands,
     mut materials: ResMut<Assets<StandardMaterial>>,
     config: Res<MapCullConfig>,
-    meshes: Query<
-        (
-            Entity,
-            &Aabb,
-            &GlobalTransform,
-            Option<&MeshMaterial3d<StandardMaterial>>,
-        ),
-        (With<Mesh3d>, Without<DefaultMaterialApplied>),
-    >,
+    meshes: UnmattedMeshQuery,
 ) {
     let cull = config.max_mesh_size.is_finite() && config.max_mesh_size > 0.0;
     let max = config.max_mesh_size;
@@ -454,8 +480,7 @@ fn apply_default_materials_and_cull(
             wmax = wmax.max(w);
         }
         let size = wmax - wmin;
-        let is_skydome =
-            cull && (size.x > max || size.y > max || size.z > max);
+        let is_skydome = cull && (size.x > max || size.y > max || size.z > max);
 
         if is_skydome {
             commands.entity(entity).insert(Visibility::Hidden);
@@ -481,6 +506,100 @@ fn apply_default_materials_and_cull(
         info!(
             touched,
             matted, hidden, "Processed map mesh entities (materials + cull)"
+        );
+    }
+}
+
+/// One-shot diagnostic: after both scenes are spawned, log every mesh entity
+/// sorted by world-space size (largest first) so we can see what's actually
+/// in the scene — terrain, water, skydomes, etc.
+fn log_loaded_meshes(
+    pending: Res<PendingMap>,
+    mut logged: ResMut<MeshesLogged>,
+    meshes: LogMeshQuery,
+) {
+    if !pending.spawned_static || !pending.spawned_terrain || pending.map_name.is_empty() {
+        return;
+    }
+
+    logged.0 = logged.0.saturating_add(1);
+    let frame = logged.0;
+
+    let mut entries: Vec<(Entity, Vec3, Vec3, bool, Option<String>)> = meshes
+        .iter()
+        .map(|(e, aabb, xform, mat, name)| {
+            let lo = aabb.min();
+            let hi = aabb.max();
+            let corners = [
+                Vec3A::new(lo.x, lo.y, lo.z),
+                Vec3A::new(hi.x, lo.y, lo.z),
+                Vec3A::new(lo.x, hi.y, lo.z),
+                Vec3A::new(hi.x, hi.y, lo.z),
+                Vec3A::new(lo.x, lo.y, hi.z),
+                Vec3A::new(hi.x, lo.y, hi.z),
+                Vec3A::new(lo.x, hi.y, hi.z),
+                Vec3A::new(hi.x, hi.y, hi.z),
+            ];
+            let mut wmin = Vec3A::splat(f32::INFINITY);
+            let mut wmax = Vec3A::splat(f32::NEG_INFINITY);
+            for c in corners {
+                let w = xform.affine().transform_point3a(c);
+                wmin = wmin.min(w);
+                wmax = wmax.max(w);
+            }
+            let center = (wmin + wmax) * 0.5;
+            let size = wmax - wmin;
+            (
+                e,
+                Vec3::from(center),
+                Vec3::from(size),
+                mat.is_some(),
+                name.map(|n| n.to_string()),
+            )
+        })
+        .collect();
+
+    entries.sort_by(|a, b| {
+        let sa = a.2.length_squared();
+        let sb = b.2.length_squared();
+        sb.partial_cmp(&sa).unwrap_or(std::cmp::Ordering::Equal)
+    });
+
+    let total = entries.len();
+    let with_mat = entries.iter().filter(|e| e.3).count();
+    let without_mat = total - with_mat;
+
+    let mut buf = String::new();
+    buf.push_str(&format!(
+        "=== Frame {frame} ===\nMesh entity diagnostic: total={total} with_mat={with_mat} without_mat={without_mat}\n\n"
+    ));
+    buf.push_str("Sorted by world-space size (largest first):\n\n");
+
+    for (i, (entity, center, size, has_mat, name)) in entries.iter().enumerate() {
+        let nm = name.as_deref().unwrap_or("(unnamed)");
+        let mat_str = if *has_mat { "MAT" } else { "no-mat" };
+        let sx = size.x;
+        let sy = size.y;
+        let sz = size.z;
+        let cx = center.x;
+        let cy = center.y;
+        let cz = center.z;
+        buf.push_str(&format!(
+            "  [{i:4}] e={entity:?} size=({sx:.0}, {sy:.0}, {sz:.0}) center=({cx:.0}, {cy:.0}, {cz:.0}) {mat_str} {nm}\n"
+        ));
+    }
+
+    use std::io::Write;
+    let mut f = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open("scene.log")
+        .expect("failed to open scene.log");
+    writeln!(f, "{buf}").expect("failed to write scene.log");
+    if frame == 1 {
+        info!(
+            total,
+            with_mat, without_mat, "Writing scene.log (every frame)"
         );
     }
 }

@@ -1,17 +1,19 @@
-use bevy::asset::AssetPlugin;
+use bevy::asset::{AssetPlugin, UnapprovedPathMode};
 use bevy::prelude::*;
 use bevy::transform::components::{GlobalTransform, Transform};
-use tribes_client::{FlycamPlugin, MapLoadRequest, MapViewerPlugin};
-
-#[allow(unused_imports)]
+#[allow(unused_imports, clippy::single_component_path_imports)]
 #[cfg(debug_assertions)]
 use bevy_dylib;
+use tribes_client::{FlycamPlugin, MapLoadRequest, MapViewerPlugin};
 
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins.set(AssetPlugin {
             // Asset root: src/decompile/assets/ (relative to bins/client manifest dir)
             file_path: "../../../decompile/assets".into(),
+            // glTF image URIs reference ../../raw/ which is outside the asset root.
+            // Allow until texture paths are fixed to stay within the asset tree.
+            unapproved_path_mode: UnapprovedPathMode::Allow,
             ..default()
         }))
         // Safety net: bevy_transform 0.19 does not call register_type in its

@@ -74,7 +74,9 @@ fn spawn_flycam(mut commands: Commands, config: Res<FlycamConfig>) {
             pitch: config.start_pitch,
         },
         Transform::from_translation(config.start_position).with_rotation(rotation),
-        GlobalTransform::from(Transform::from_translation(config.start_position).with_rotation(rotation)),
+        GlobalTransform::from(
+            Transform::from_translation(config.start_position).with_rotation(rotation),
+        ),
         Visibility::default(),
         Camera3d::default(),
         Projection::Perspective(PerspectiveProjection {
