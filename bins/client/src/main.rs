@@ -1,4 +1,4 @@
-use bevy::asset::{AssetPlugin, UnapprovedPathMode};
+use bevy::asset::AssetPlugin;
 use bevy::prelude::*;
 use bevy::transform::components::{GlobalTransform, Transform};
 #[allow(unused_imports, clippy::single_component_path_imports)]
