@@ -76,6 +76,9 @@ impl Default for MapCullConfig {
 #[derive(Component)]
 struct DefaultMaterialApplied;
 
+#[derive(Resource, Default)]
+struct MaterialsFixed(bool);
+
 type UnmattedMeshQuery<'w, 's> = Query<
     'w,
     's,
@@ -156,6 +159,7 @@ impl Plugin for MapViewerPlugin {
             .insert_resource(PendingMap::default())
             .insert_resource(MapAssetsRoot(self.assets_root.clone()))
             .init_resource::<MapCullConfig>()
+            .init_resource::<MaterialsFixed>()
             .insert_resource(GlobalAmbientLight {
                 color: Color::srgb(1.0, 1.0, 1.0),
                 brightness: 200.0,
@@ -182,6 +186,7 @@ impl Plugin for MapViewerPlugin {
                     apply_default_materials_and_cull,
                     draw_gameplay_marker_gizmos,
                     debug_nearby_meshes,
+                    disable_backface_culling,
                 )
                     .chain(),
             );
@@ -485,6 +490,23 @@ fn apply_default_materials_and_cull(
             matted, hidden, "Processed map mesh entities (materials + cull)"
         );
     }
+}
+
+fn disable_backface_culling(
+    pending: Res<PendingMap>,
+    mut fixed: ResMut<MaterialsFixed>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+) {
+    if !pending.spawned_static || fixed.0 {
+        return;
+    }
+    fixed.0 = true;
+    let mut count = 0;
+    for (_, mat) in materials.iter_mut() {
+        mat.cull_mode = None;
+        count += 1;
+    }
+    info!(count, "Disabled back-face culling on all materials");
 }
 
 /// Encode an `Entity` as a stable `u64` for hashing. Entity has a `u32` index
