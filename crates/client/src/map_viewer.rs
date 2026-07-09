@@ -387,7 +387,7 @@ fn spawn_actor_markers(
         });
 
         let pos_ue = Vec3::from_array(actor.location);
-        let pos_gltf = Vec3::new(pos_ue.x, pos_ue.z, -pos_ue.y);
+        let pos_gltf = Vec3::new(pos_ue.x, pos_ue.z, pos_ue.y);
         let q_ue = Quat::from_array(actor.rotation);
         let q_gltf = c * q_ue * c.inverse();
 
