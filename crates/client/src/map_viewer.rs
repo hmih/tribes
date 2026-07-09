@@ -549,8 +549,7 @@ fn debug_nearby_meshes(
     };
     let cam_pos = cam_xform.translation();
 
-    // Radius for "nearby" - show meshes within this distance
-    const RADIUS: f32 = 50000.0;
+    const RADIUS: f32 = 2000.0;
 
     let mut nearby: Vec<(f32, Vec3, String)> = meshes
         .iter()
@@ -567,21 +566,16 @@ fn debug_nearby_meshes(
 
     nearby.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
 
-    info!(
-        count = nearby.len(),
-        radius = RADIUS,
-        cam = format!("({:.0}, {:.0}, {:.0})", cam_pos.x, cam_pos.y, cam_pos.z),
-        "Nearby meshes (Tab pressed):"
+    let mut out = format!(
+        "cam=({:.1},{:.1},{:.1}) radius={RADIUS:.1} count={}\n",
+        cam_pos.x, cam_pos.y, cam_pos.z, nearby.len()
     );
-    for (dist, pos, name) in nearby.iter().take(30) {
-        info!(
-            dist = format!("{:.0}", dist),
-            pos = format!("({:.0},{:.0},{:.0})", pos.x, pos.y, pos.z),
-            name = name.as_str(),
-            ""
-        );
+    for (dist, pos, name) in &nearby {
+        out.push_str(&format!(
+            "dist={dist:.0} pos=({pos:.0},{pos:.0},{pos:.0}) {name}\n"
+        ));
     }
-    if nearby.len() > 30 {
-        info!(more = nearby.len() - 30, "...");
-    }
+
+    let _ = std::fs::write("nearby_meshes.txt", out);
+    info!(count = nearby.len(), "Tab pressed — wrote nearby_meshes.txt");
 }
