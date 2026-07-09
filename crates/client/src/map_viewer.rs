@@ -12,8 +12,6 @@
 //! [`GameplayMarker`] and [`Team`](tribes_core::Team) components. A gizmo
 //! system draws colored spheres/boxes at their locations every frame.
 
-use std::f32::consts::FRAC_PI_2;
-
 use bevy::asset::LoadState;
 use bevy::camera::primitives::Aabb;
 use bevy::light::GlobalAmbientLight;
@@ -364,8 +362,8 @@ fn spawn_actor_markers(
         return;
     };
 
-    // UE3→glTF axis transform: matches the build-time gltf_assembler.
-    let c = Quat::from_rotation_x(FRAC_PI_2);
+    // UE3→glTF axis transform: (x,y,z)_ue → (x,z,y)_gltf.
+    // Quaternion: swap Y/Z components to match the axis remapping.
 
     info!(
         count = actors.actors.len(),
@@ -389,7 +387,7 @@ fn spawn_actor_markers(
         let pos_ue = Vec3::from_array(actor.location);
         let pos_gltf = Vec3::new(pos_ue.x, pos_ue.z, pos_ue.y);
         let q_ue = Quat::from_array(actor.rotation);
-        let q_gltf = c * q_ue * c.inverse();
+        let q_gltf = Quat::from_xyzw(q_ue.x, q_ue.z, q_ue.y, q_ue.w);
 
         commands.spawn((
             GameplayMarker { kind, team },
