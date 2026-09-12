@@ -16,8 +16,28 @@ use bevy::asset::LoadState;
 use bevy::camera::primitives::Aabb;
 use bevy::light::GlobalAmbientLight;
 use bevy::prelude::{DefaultGizmoConfigGroup, GizmoLineConfig, GizmoLineJoint, *};
-use tribes_assets::{AssetsPlugin, MapActors, t3d};
+use tribes_assets::{AssetsPlugin, MapActors, MapProps, t3d};
 use tribes_core::Team;
+
+/// Convert a UE3-space transform to glTF world space.
+///
+/// `(x, y, z)_ue → (x, z, y)_gltf`, with the quaternion's Y/Z components swapped
+/// to match. This mirrors the map's `ue3_to_gltf_root` node matrix so props and
+/// markers land on top of the static geometry.
+///
+/// The mapping is a reflection (det = -1), which is required rather than
+/// accidental: UE3 is left-handed and glTF is right-handed, so a faithful
+/// conversion is improper. Substituting a pure rotation mirrors the world (it
+/// swaps the BloodEagle and DiamondSword bases). Because the scene is mirrored,
+/// the assembler compensates triangle winding — do not "fix" that by making
+/// materials double-sided, since Bevy inverts the normal on the back face of a
+/// double-sided material and every up-facing surface goes dark.
+fn ue3_to_gltf(location: &[f32; 3], rotation: &[f32; 4]) -> (Vec3, Quat) {
+    (
+        Vec3::new(location[0], location[2], location[1]),
+        Quat::from_xyzw(rotation[0], rotation[2], rotation[1], rotation[3]),
+    )
+}
 
 /// Default world-space size threshold (in glTF units) above which a mesh is
 /// considered a sky-dome / occlusion hull and hidden from rendering. Perdition
@@ -29,11 +49,12 @@ pub const DEFAULT_SKYDOME_CULL_SIZE: f32 = 5_000_000.0;
 ///
 /// Default assumes the `bin/client` is run with the `AssetServer` folder
 /// pointed at `src/decompile/assets/`. Override via [`MapViewerPlugin::new`].
-const DEFAULT_ASSETS_ROOT: &str = ".";
+const DEFAULT_ASSETS_ROOT: &str = "gltf";
 
 /// Message requesting a map load. The string is the map directory name
-/// (e.g. `"Perdition"`); files are resolved as `maps/<Map>/<Map>.gltf`,
-/// `maps/<Map>/<Map>_Ter.terrain.gltf`, and `maps/<Map>/<Map>.scene.actors.json`.
+/// (e.g. `"Perdition"`); files are resolved as `<root>/maps/<Map>/<Map>.gltf`,
+/// `<root>/maps/<Map>/<Map>_Ter.terrain.gltf`, and `<root>/maps/<Map>/<Map>.scene.actors.json`.
+/// Default root is `gltf` (relative to Bevy asset `file_path`).
 #[derive(Message, Clone, Debug)]
 pub struct MapLoadRequest(pub String);
 
@@ -45,9 +66,11 @@ struct PendingMap {
     gltf: Handle<bevy::gltf::Gltf>,
     terrain: Option<Handle<bevy::gltf::Gltf>>,
     actors: Handle<MapActors>,
+    props: Handle<MapProps>,
     spawned_static: bool,
     spawned_terrain: bool,
     spawned_actors: bool,
+    spawned_props: bool,
     map_name: String,
 }
 
@@ -75,9 +98,6 @@ impl Default for MapCullConfig {
 /// per-frame system skip entities it has already touched.
 #[derive(Component)]
 struct DefaultMaterialApplied;
-
-#[derive(Resource, Default)]
-struct MaterialsFixed(bool);
 
 type UnmattedMeshQuery<'w, 's> = Query<
     'w,
@@ -154,20 +174,31 @@ impl MapViewerPlugin {
 
 impl Plugin for MapViewerPlugin {
     fn build(&self, app: &mut App) {
+        // In diagnostic-capture mode the marker gizmos are suppressed: they are
+        // debug aids, not map geometry, and they contaminate every comparison
+        // shot. See `crate::shot::capture_mode`.
+        let capture = crate::shot::capture_mode();
+        if capture {
+            info!("Diagnostic capture mode: gameplay marker gizmos disabled");
+        }
+
         app.add_plugins(AssetsPlugin)
             .add_message::<MapLoadRequest>()
             .insert_resource(PendingMap::default())
             .insert_resource(MapAssetsRoot(self.assets_root.clone()))
             .init_resource::<MapCullConfig>()
-            .init_resource::<MaterialsFixed>()
             .insert_resource(GlobalAmbientLight {
                 color: Color::srgb(1.0, 1.0, 1.0),
-                brightness: 200.0,
+                // Raised from 200: with only a fill light for bounce, shadowed
+                // geometry measured ~1/3 the luminance of sunlit surfaces and read
+                // as black. This lifts the shadow floor without washing out the sun.
+                brightness: 1_500.0,
                 affects_lightmapped_meshes: true,
             })
             .insert_gizmo_config::<DefaultGizmoConfigGroup>(
                 DefaultGizmoConfigGroup,
                 GizmoConfig {
+                    enabled: !capture,
                     line: GizmoLineConfig {
                         joints: GizmoLineJoint::Round(4),
                         ..default()
@@ -183,37 +214,62 @@ impl Plugin for MapViewerPlugin {
                     spawn_static_scene,
                     spawn_terrain_scene,
                     spawn_actor_markers,
+                    spawn_map_props,
                     apply_default_materials_and_cull,
-                    draw_gameplay_marker_gizmos,
+                    draw_gameplay_marker_gizmos.run_if(not_capturing),
                     debug_nearby_meshes,
-                    disable_backface_culling,
                 )
                     .chain(),
             );
     }
 }
 
+/// Run condition: skip a debug system while taking a diagnostic capture.
+fn not_capturing() -> bool {
+    !crate::shot::capture_mode()
+}
+
 fn spawn_sun_light(mut commands: Commands) {
+    // Shadow cascades sized for this scene's scale. Bevy's default config covers
+    // roughly a thousand units, which on a map spanning ~131k units leaves almost
+    // everything outside the shadow map and the rest aliasing badly.
+    let cascades = bevy::light::CascadeShadowConfigBuilder {
+        num_cascades: 4,
+        minimum_distance: 50.0,
+        first_cascade_far_bound: 4_000.0,
+        maximum_distance: 30_000.0,
+        ..default()
+    }
+    .build();
+
     commands.spawn((
         DirectionalLight {
             shadow_maps_enabled: true,
             illuminance: 80_000.0,
+            // Scene units are large (a building is ~500 units tall), so Bevy's
+            // defaults (depth 0.02, normal 1.8) are far too small and produce
+            // shadow acne — self-shadowing on surfaces facing the sun.
+            shadow_depth_bias: 0.2,
+            shadow_normal_bias: 40.0,
             ..default()
         },
+        cascades,
         Transform::from_xyz(50_000.0, 150_000.0, 50_000.0).looking_at(Vec3::ZERO, Vec3::Y),
         GlobalTransform::IDENTITY,
     ));
-    // Fill light from the opposite side
+    // Fill light from the opposite side. Bright enough that surfaces facing away
+    // from the sun are readable rather than crushed to near-black.
     commands.spawn((
         DirectionalLight {
             shadow_maps_enabled: false,
-            illuminance: 15_000.0,
+            illuminance: 30_000.0,
             ..default()
         },
         Transform::from_xyz(-50_000.0, 80_000.0, -50_000.0).looking_at(Vec3::ZERO, Vec3::Y),
         GlobalTransform::IDENTITY,
     ));
-    // Environment map for specular/reflections on PBR materials
+    // Environment map for specular/reflections on PBR materials. Without an HDR
+    // asset this contributes little, so it is paired with the ambient below.
     commands.spawn((
         EnvironmentMapLight {
             intensity: 2000.0,
@@ -235,15 +291,18 @@ fn handle_map_load_request(
         let gltf = asset_server.load(format!("{map_dir}/{map}.gltf"));
         let terrain = asset_server.load(format!("{map_dir}/{map}_Ter.terrain.gltf"));
         let actors = asset_server.load(format!("{map_dir}/{map}.scene.actors.json"));
+        let props = asset_server.load(format!("{map_dir}/{map}.props.json"));
 
         info!(map = %map, "Loading map assets");
         *pending = PendingMap {
             gltf,
             terrain: Some(terrain),
             actors,
+            props,
             spawned_static: false,
             spawned_terrain: false,
             spawned_actors: false,
+            spawned_props: false,
             map_name: map.clone(),
         };
     }
@@ -368,10 +427,7 @@ fn spawn_actor_markers(
             }
         });
 
-        let pos_ue = Vec3::from_array(actor.location);
-        let pos_gltf = Vec3::new(pos_ue.x, pos_ue.z, pos_ue.y);
-        let q_ue = Quat::from_array(actor.rotation);
-        let q_gltf = Quat::from_xyzw(q_ue.x, q_ue.z, q_ue.y, q_ue.w);
+        let (pos_gltf, q_gltf) = ue3_to_gltf(&actor.location, &actor.rotation);
 
         commands.spawn((
             GameplayMarker { kind, team },
@@ -383,6 +439,71 @@ fn spawn_actor_markers(
     }
     pending.spawned_actors = true;
     info!("Actor markers spawned");
+}
+
+/// Instantiate archetype-resolved props (flag stands, stations, turrets,
+/// generators, vehicle pads, ...).
+///
+/// These meshes are attached through a `SkeletalMeshComponent` whose
+/// `SkeletalMesh=` lives in the class default object, so they never appear in the
+/// map's actor records and cannot be part of the combined static glTF. The
+/// assembler resolves them from the decompiled `.uc` tree and lists the `.glb` to
+/// spawn per actor in `<Map>.props.json`.
+fn spawn_map_props(
+    mut pending: ResMut<PendingMap>,
+    prop_assets: Res<Assets<MapProps>>,
+    asset_server: Res<AssetServer>,
+    assets_root: Res<MapAssetsRoot>,
+    mut commands: Commands,
+) {
+    if pending.spawned_props || pending.map_name.is_empty() {
+        return;
+    }
+    let id = pending.props.id();
+    if !asset_server.is_loaded(id) {
+        return;
+    }
+    // Older maps have no props manifest; tolerate a failed load like terrain.
+    if let Some(state) = asset_server.get_load_state(id)
+        && matches!(state, LoadState::Failed(_))
+    {
+        pending.spawned_props = true;
+        debug!(map = %pending.map_name, "No props manifest for this map");
+        return;
+    }
+    let Some(props) = prop_assets.get(&pending.props) else {
+        return;
+    };
+
+    let mut spawned = 0usize;
+    for prop in &props.props {
+        if prop.glb.is_empty() {
+            continue;
+        }
+        // `#Scene0` selects the glTF's first scene as a spawnable WorldAsset.
+        let scene: Handle<bevy::world_serialization::WorldAsset> =
+            asset_server.load(format!("{}/{}#Scene0", assets_root.0, prop.glb));
+        let (pos, rot) = ue3_to_gltf(&prop.location, &prop.rotation);
+        // Scale uses the same Y/Z swap as the position.
+        let scale = Vec3::new(prop.scale3d[0], prop.scale3d[2], prop.scale3d[1]);
+
+        commands.spawn((
+            WorldAssetRoot(scene),
+            Transform::from_translation(pos)
+                .with_rotation(rot)
+                .with_scale(scale),
+            GlobalTransform::IDENTITY,
+            Visibility::default(),
+            Name::new(format!("{} [{}]", prop.actor, prop.component)),
+        ));
+        spawned += 1;
+    }
+    pending.spawned_props = true;
+    info!(
+        count = spawned,
+        map = %pending.map_name,
+        "Spawned archetype props"
+    );
 }
 
 fn draw_gameplay_marker_gizmos(
@@ -490,23 +611,6 @@ fn apply_default_materials_and_cull(
             matted, hidden, "Processed map mesh entities (materials + cull)"
         );
     }
-}
-
-fn disable_backface_culling(
-    pending: Res<PendingMap>,
-    mut fixed: ResMut<MaterialsFixed>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-) {
-    if !pending.spawned_static || fixed.0 {
-        return;
-    }
-    fixed.0 = true;
-    let mut count = 0;
-    for (_, mat) in materials.iter_mut() {
-        mat.cull_mode = None;
-        count += 1;
-    }
-    info!(count, "Disabled back-face culling on all materials");
 }
 
 /// Encode an `Entity` as a stable `u64` for hashing. Entity has a `u32` index

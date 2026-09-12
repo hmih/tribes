@@ -4,6 +4,9 @@
 //! - [`MapScene`] (`.scene.json`): mesh instances + (legacy) actor list.
 //! - [`MapActors`] (`.scene.actors.json`): gameplay actors (spawns, flag bases, turrets,
 //!   generators) with class/location/rotation and a T3D text property map.
+//! - [`MapProps`] (`.props.json`): archetype-resolved props (base structures and
+//!   deployables whose mesh comes from a class default object) plus the `.glb` to
+//!   instantiate for each.
 //!
 //! ## Coordinate spaces
 //!
@@ -259,12 +262,51 @@ pub struct MapActors {
     pub actors: Vec<GameplayActor>,
 }
 
+/// One placed prop whose mesh assignment lives in a class default object
+/// (archetype) rather than in the map's actor records, in **UE3 coordinates**.
+///
+/// Base structures and deployables (flag stands, inventory/repair stations, base
+/// turrets, generators, radar stations, vehicle pads) attach their mesh through a
+/// `SkeletalMeshComponent` whose `SkeletalMesh=` lives in `Default__<Class>`, so
+/// cooked map records never contain it. The assembler resolves it from the
+/// decompiled `.uc` tree and emits this sidecar manifest.
+///
+/// `glb` is a path relative to the glTF asset root, e.g.
+/// `skeletal-meshes/TribesGame/STN_Inventory/Models/SKL_STN_Inventory.glb`.
+///
+/// See the module docs for the UE3→glTF conversion formulas.
+#[derive(Debug, Clone, Deserialize, Serialize, TypePath, Asset)]
+pub struct MapProp {
+    pub actor: String,
+    pub class: String,
+    pub component: String,
+    /// UE3 object path, e.g. `STN_Inventory.Models.SKL_STN_Inventory`.
+    pub mesh: String,
+    /// `"skeletal"` or `"static"`.
+    pub mesh_type: String,
+    pub glb: String,
+    pub location: [f32; 3],
+    /// UE3-space quaternion `(x, y, z, w)`.
+    pub rotation: [f32; 4],
+    pub scale3d: [f32; 3],
+}
+
+/// Archetype-resolved props for one map (`<Map>.props.json`).
+#[derive(Debug, Clone, Deserialize, Serialize, TypePath, Asset)]
+pub struct MapProps {
+    pub map: String,
+    #[serde(rename = "prop_count")]
+    pub prop_count: usize,
+    pub props: Vec<MapProp>,
+}
+
 /// Bevy plugin registering the typed JSON asset loaders for map data.
 ///
 /// After `add_plugins(AssetsPlugin)`, load assets via:
 /// ```ignore
 /// let scene: Handle<MapScene> = asset_server.load("maps/Perdition/Perdition.scene.json");
 /// let actors: Handle<MapActors> = asset_server.load("maps/Perdition/Perdition.scene.actors.json");
+/// let props: Handle<MapProps> = asset_server.load("maps/Perdition/Perdition.props.json");
 /// ```
 pub struct AssetsPlugin;
 
@@ -272,11 +314,15 @@ impl Plugin for AssetsPlugin {
     fn build(&self, app: &mut bevy::app::App) {
         app.init_asset::<MapScene>()
             .init_asset::<MapActors>()
+            .init_asset::<MapProps>()
             .add_plugins(bevy_common_assets::json::JsonAssetPlugin::<MapScene>::new(
                 &["scene.json"],
             ))
             .add_plugins(bevy_common_assets::json::JsonAssetPlugin::<MapActors>::new(
                 &["scene.actors.json"],
+            ))
+            .add_plugins(bevy_common_assets::json::JsonAssetPlugin::<MapProps>::new(
+                &["props.json"],
             ));
     }
 }

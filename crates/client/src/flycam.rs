@@ -43,7 +43,15 @@ impl Default for FlycamConfig {
             // skydomes, which are culled) spans about ±33k units; start 25k up
             // at a steep pitch so the whole arena is visible on first frame.
             start_position: Vec3::new(0.0, 25_000.0, 0.0),
-            start_yaw: 0.0,
+            // The faithful UE3→glTF root maps game-forward (+X_ue) to glTF +X, so
+            // yawing -90° makes game-forward point up-screen and game-right
+            // (+Y_ue → glTF +Z) point screen-right. At yaw 0 the map reads
+            // sideways (forward = screen-right, right = screen-down).
+            //
+            // This is the correct place to fix map orientation: rotating the
+            // camera is a proper transform, whereas mirroring the world (or
+            // swapping the root to (x,z,-y)) flips the map relative to the game.
+            start_yaw: -std::f32::consts::FRAC_PI_2,
             start_pitch: -1.2,
             move_speed: 3_000.0,
             sprint_multiplier: 8.0,

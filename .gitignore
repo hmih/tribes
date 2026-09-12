@@ -4,3 +4,6 @@
 # macOS
 .DS_Store
 scene.log
+
+# Debug artifact written by the Tab key (debug_nearby_meshes)
+nearby_meshes.txt

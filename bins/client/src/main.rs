@@ -4,12 +4,12 @@ use bevy::transform::components::{GlobalTransform, Transform};
 #[allow(unused_imports, clippy::single_component_path_imports)]
 #[cfg(debug_assertions)]
 use bevy_dylib;
-use tribes_client::{FlycamPlugin, MapLoadRequest, MapViewerPlugin};
+use tribes_client::{DiagnosticShotPlugin, FlycamPlugin, MapLoadRequest, MapViewerPlugin};
 
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins.set(AssetPlugin {
-            file_path: "../../../importer/output/gltf".into(),
+            file_path: "../../../importer/output".into(),
             ..default()
         }))
         // Safety net: bevy_transform 0.19 does not call register_type in its
@@ -20,10 +20,15 @@ fn main() {
         .register_type::<GlobalTransform>()
         .add_plugins(FlycamPlugin)
         .add_plugins(MapViewerPlugin::default())
-        .add_systems(Startup, load_perdition)
+        // No-op unless TASCEND_SHOT is set; see crates/client/src/shot.rs.
+        .add_plugins(DiagnosticShotPlugin)
+        .add_systems(Startup, load_map)
         .run();
 }
 
-fn load_perdition(mut writer: bevy::ecs::message::MessageWriter<MapLoadRequest>) {
-    writer.write(MapLoadRequest("ArxNovena".into()));
+/// Map directory to load, overridable with `TASCEND_MAP` so diagnostic captures
+/// can target a specific map without a rebuild.
+fn load_map(mut writer: bevy::ecs::message::MessageWriter<MapLoadRequest>) {
+    let map = std::env::var("TASCEND_MAP").unwrap_or_else(|_| "ArxNovena".into());
+    writer.write(MapLoadRequest(map));
 }
