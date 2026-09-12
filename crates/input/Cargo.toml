@@ -8,3 +8,6 @@ tribes-core.workspace = true
 bevy = { workspace = true, features = ["std"] }
 leafwing-input-manager.workspace = true
 serde.workspace = true
+
+[lints]
+workspace = true

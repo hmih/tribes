@@ -12,3 +12,6 @@ tribes-client.workspace = true
 bevy.workspace = true
 bevy_dylib = "0.19"
 log.workspace = true
+
+[lints]
+workspace = true

@@ -24,3 +24,6 @@ lightyear = { workspace = true, features = [
   "netcode", "prediction", "replication",
 ] }
 leafwing-input-manager.workspace = true
+
+[lints]
+workspace = true

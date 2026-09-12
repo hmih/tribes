@@ -59,3 +59,6 @@ leafwing-input-manager.workspace = true
 # bevy_hanabi = "0.19"
 # bevy_kira_audio = "0.26"
 # bevy_tweening = "0.16"
+
+[lints]
+workspace = true

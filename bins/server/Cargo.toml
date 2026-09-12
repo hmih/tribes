@@ -11,3 +11,6 @@ path = "src/main.rs"
 tribes-server.workspace = true
 bevy.workspace = true
 log.workspace = true
+
+[lints]
+workspace = true
